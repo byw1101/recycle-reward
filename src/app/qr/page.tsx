@@ -72,7 +72,7 @@ export default function QRPage() {
         .from('qr_codes')
         .select('*')
         .eq('code', code)
-        .single();
+        .maybeSingle();
 
       if (dbError || !qrData) {
         const errorDetail = dbError ? dbError.message : 'DB에 없음';
@@ -99,8 +99,8 @@ export default function QRPage() {
         .eq('code', code);
 
       if (updateError) {
-        setErrorMsg('처리 중 오류가 발생했습니다. 다시 시도해주세요.');
-        setTimeout(() => { setErrorMsg(null); if(scanner) scanner.resume(); setIsProcessing(false); }, 3000);
+        setErrorMsg(`처리 중 오류: ${updateError.message}`);
+        setTimeout(() => { setErrorMsg(null); if(scanner) scanner.resume(); setIsProcessing(false); }, 4000);
         return;
       }
 
