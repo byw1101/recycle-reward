@@ -1,22 +1,43 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { supabase } from '@/core/utils/supabaseClient';
 
 export default function Header() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    // 클라이언트 측에서만 로컬 스토리지 확인
-    const user = localStorage.getItem('user');
-    if (user) {
-      setIsLoggedIn(true);
-      const parsedUser = JSON.parse(user);
-      setIsAdmin(parsedUser.role === 'admin');
-    }
+    // 1. 초기 세션 로드
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setIsLoggedIn(true);
+        localStorage.setItem('user', JSON.stringify({ id: session.user.email }));
+        supabase.from('profiles').select('role').eq('id', session.user.id).single()
+          .then(({ data }) => {
+            if (data?.role === 'admin') setIsAdmin(true);
+          });
+      }
+    });
+
+    // 2. 로그인 상태 변화 감지
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+      if (session) {
+        localStorage.setItem('user', JSON.stringify({ id: session.user.email }));
+        supabase.from('profiles').select('role').eq('id', session.user.id).single()
+          .then(({ data }) => setIsAdmin(data?.role === 'admin'));
+      } else {
+        localStorage.removeItem('user');
+        setIsAdmin(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem('user');
     window.location.href = '/';
   };

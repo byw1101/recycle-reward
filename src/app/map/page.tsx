@@ -2,8 +2,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { supabase } from '@/core/utils/supabaseClient';
 
-// 리액트 리플렛은 브라우저 환경에서만 동작하므로 SSR 비활성화
 const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
 const Marker = dynamic(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
@@ -24,22 +24,23 @@ export default function MapPage() {
       document.head.appendChild(link);
     }
 
-    // 로컬 스토리지에서 장소 데이터 가져오기 (관리자가 등록한 데이터)
-    const saved = localStorage.getItem('locations');
-    if (saved) {
-      setLocations(JSON.parse(saved));
-    } else {
-      // 기본 더미 데이터
-      const defaultLocs = [
-        { id: 1, name: '단국대 학생회관 앞 쓰레기장', address: '경기 용인시 수지구 죽전로 152', lat: 37.3216, lng: 127.1268 },
-        { id: 2, name: '기숙사 진리관 분리수거장', address: '경기 용인시 수지구 죽전로 152', lat: 37.3220, lng: 127.1275 }
-      ];
-      setLocations(defaultLocs);
-      localStorage.setItem('locations', JSON.stringify(defaultLocs));
-    }
+    // DB에서 장소 데이터 가져오기
+    const fetchLocations = async () => {
+      const { data } = await supabase.from('locations').select('*');
+      if (data && data.length > 0) {
+        setLocations(data);
+      } else {
+        // DB가 비어있을 경우 보여줄 기본 더미 데이터
+        setLocations([
+          { id: 1, name: '단국대 학생회관 앞 쓰레기장', address: '경기 용인시 수지구 죽전로 152', lat: 37.3216, lng: 127.1268 },
+          { id: 2, name: '기숙사 진리관 분리수거장', address: '경기 용인시 수지구 죽전로 152', lat: 37.3220, lng: 127.1275 }
+        ]);
+      }
+    };
+    
+    fetchLocations();
   }, []);
 
-  // 기본 마커 아이콘 설정 (리플렛 디폴트 경로 오류 해결)
   const icon = useMemo(() => {
     if (typeof window !== 'undefined') {
       const L = require('leaflet');
@@ -62,7 +63,7 @@ export default function MapPage() {
         <Link href="/" className="text-gray-500 mr-4">
            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         </Link>
-        <h2 className="text-lg font-bold text-gray-800">배출 장소 안내</h2>
+        <h2 className="text-lg font-bold text-gray-800">배출 장소 안내 (DB)</h2>
       </div>
 
       <div className="w-full h-80 bg-gray-200 relative z-0">
