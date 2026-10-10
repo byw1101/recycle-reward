@@ -75,7 +75,7 @@ export default function QRPage() {
         .single();
 
       if (dbError || !qrData) {
-        setErrorMsg('등록되지 않은 잘못된 QR 코드입니다.');
+        setErrorMsg(`등록되지 않은 QR입니다. [스캔내용: ${code}]`);
         setTimeout(() => { setErrorMsg(null); if(scanner) scanner.resume(); setIsProcessing(false); }, 3000);
         return;
       }
