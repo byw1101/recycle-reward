@@ -75,8 +75,9 @@ export default function QRPage() {
         .single();
 
       if (dbError || !qrData) {
-        setErrorMsg(`등록되지 않은 QR입니다. [스캔내용: ${code}]`);
-        setTimeout(() => { setErrorMsg(null); if(scanner) scanner.resume(); setIsProcessing(false); }, 3000);
+        const errorDetail = dbError ? dbError.message : 'DB에 없음';
+        setErrorMsg(`등록되지 않은 QR입니다. [스캔내용: ${code}] [에러: ${errorDetail}]`);
+        setTimeout(() => { setErrorMsg(null); if(scanner) scanner.resume(); setIsProcessing(false); }, 4000);
         return;
       }
 
