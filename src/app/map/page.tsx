@@ -11,7 +11,7 @@ declare global {
 }
 
 export default function MapPage() {
-  const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || '';
+  const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || 'd2614b7fbe124fc4d7968316a1df117c';
   
   const [loading, error] = useKakaoLoader({
     appkey: kakaoAppKey,
