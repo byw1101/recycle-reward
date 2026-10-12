@@ -58,51 +58,44 @@ export default function MapPage() {
         </span>
       </div>
 
-      {/* 카카오맵 뷰포트 영역 */}
-      <div className="w-full h-84 bg-slate-100 relative z-0 flex items-center justify-center border-b">
-        {!kakaoAppKey ? (
-          <div className="p-6 text-center space-y-2 max-w-sm">
-            <div className="w-12 h-12 bg-yellow-100 text-yellow-700 rounded-2xl flex items-center justify-center mx-auto font-bold text-xl">
-              🗺️
-            </div>
-            <h3 className="font-bold text-gray-800 text-sm">카카오맵 JavaScript 키가 필요합니다</h3>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              카카오 디벨로퍼스에서 발급받은 <strong>JavaScript 키</strong>를 등록하시면 대한민국 초정밀 지도가 나타납니다.
-            </p>
-          </div>
-        ) : loading ? (
-          <div className="flex flex-col items-center space-y-2">
+      {/* 카카오맵 뷰포트 영역 (고정 높이 360px 지정으로 렌더링 보장) */}
+      <div className="w-full h-[360px] bg-slate-200 relative z-0 border-b overflow-hidden">
+        {loading ? (
+          <div className="w-full h-full flex flex-col items-center justify-center space-y-2 bg-slate-100">
             <span className="w-8 h-8 border-3 border-yellow-400 border-t-transparent rounded-full animate-spin"></span>
             <p className="text-xs text-gray-500 font-semibold">카카오맵 로딩 중...</p>
           </div>
         ) : error ? (
-          <div className="p-4 text-center text-xs text-red-500">
-            카카오맵을 불러올 수 없습니다. 도메인 등록(Web 플랫폼)을 확인해주세요.
+          <div className="w-full h-full flex items-center justify-center p-4 text-center text-xs text-red-500 bg-red-50">
+            카카오맵을 불러올 수 없습니다. 카카오 디벨로퍼스 도메인 설정을 확인해주세요.
           </div>
         ) : (
           <Map
             center={{
-              lat: selectedLoc?.lat || 36.8335,
-              lng: selectedLoc?.lng || 127.1687,
+              lat: Number(selectedLoc?.lat || 36.8335),
+              lng: Number(selectedLoc?.lng || 127.1687),
             }}
-            style={{ width: '100%', height: '100%' }}
-            level={4} // 확대 레벨
+            style={{ width: '100%', height: '360px' }}
+            level={4} // 지도 확대 레벨
           >
-            {locations.map((loc) => (
-              <MapMarker
-                key={loc.id}
-                position={{ lat: loc.lat, lng: loc.lng }}
-                clickable={true}
-                onClick={() => setSelectedLoc(loc)}
-              >
-                {selectedLoc?.id === loc.id && (
-                  <div className="p-2 text-xs font-bold text-gray-900 bg-white rounded-lg shadow-md border border-gray-200 text-center min-w-[120px]">
-                    <p className="text-primary-600 truncate">{loc.name}</p>
-                    <p className="text-[10px] text-gray-500 font-normal truncate mt-0.5">{loc.address}</p>
-                  </div>
-                )}
-              </MapMarker>
-            ))}
+            {locations.map((loc) => {
+              const isSelected = selectedLoc?.id === loc.id;
+              return (
+                <MapMarker
+                  key={loc.id}
+                  position={{ lat: Number(loc.lat), lng: Number(loc.lng) }}
+                  clickable={true}
+                  onClick={() => setSelectedLoc(loc)}
+                >
+                  {isSelected && (
+                    <div className="p-2 text-xs font-bold text-gray-900 bg-white rounded-lg shadow-md border border-gray-200 text-center min-w-[120px]">
+                      <p className="text-primary-600 truncate">{loc.name}</p>
+                      <p className="text-[10px] text-gray-500 font-normal truncate mt-0.5">{loc.address}</p>
+                    </div>
+                  )}
+                </MapMarker>
+              );
+            })}
           </Map>
         )}
       </div>
