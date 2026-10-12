@@ -1,109 +1,149 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
+import { useKakaoLoader, Map, MapMarker } from 'react-kakao-maps-sdk';
 import { supabase } from '@/core/utils/supabaseClient';
 
-const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
-const Marker = dynamic(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
-const Popup = dynamic(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
+declare global {
+  interface Window {
+    kakao: any;
+  }
+}
 
 export default function MapPage() {
+  const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || '';
+  
+  const [loading, error] = useKakaoLoader({
+    appkey: kakaoAppKey,
+    libraries: ['services', 'clusterer'],
+  });
+
   const [locations, setLocations] = useState<any[]>([]);
-  const [isClient, setIsClient] = useState(false);
+  const [selectedLoc, setSelectedLoc] = useState<any | null>(null);
 
   useEffect(() => {
-    setIsClient(true);
-    // Leaflet 기본 CSS 로드
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id = 'leaflet-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-    }
-
     // DB에서 장소 데이터 가져오기
     const fetchLocations = async () => {
-      const { data } = await supabase.from('locations').select('*');
+      const { data } = await supabase.from('locations').select('*').order('id', { ascending: false });
       if (data && data.length > 0) {
         setLocations(data);
+        setSelectedLoc(data[0]); // 첫 번째 장소 선택
       } else {
-        // DB가 비어있을 경우 보여줄 기본 더미 데이터
-        setLocations([
-          { id: 1, name: '단국대 학생회관 앞 쓰레기장', address: '경기 용인시 수지구 죽전로 152', lat: 37.3216, lng: 127.1268 },
-          { id: 2, name: '기숙사 진리관 분리수거장', address: '경기 용인시 수지구 죽전로 152', lat: 37.3220, lng: 127.1275 }
-        ]);
+        // 기본 천안시 더미 데이터 (단국대 및 신부동)
+        const defaultLocs = [
+          { id: 1, name: '단국대 학생회관 앞 스마트클린하우스', address: '충남 천안시 동남구 단대로 119', lat: 36.8335, lng: 127.1687 },
+          { id: 2, name: '신부동 행정복지센터 인근 수거거점', address: '충남 천안시 동남구 신부동 456-1', lat: 36.8188, lng: 127.1563 }
+        ];
+        setLocations(defaultLocs);
+        setSelectedLoc(defaultLocs[0]);
       }
     };
     
     fetchLocations();
   }, []);
 
-  const icon = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      const L = require('leaflet');
-      return new L.Icon({
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41]
-      });
-    }
-    return null;
-  }, []);
-
   return (
     <div className="flex flex-col min-h-full bg-slate-50">
-      <div className="p-4 bg-white shadow-sm flex items-center z-10 relative">
-        <Link href="/" className="text-gray-500 mr-4">
-           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-        </Link>
-        <h2 className="text-lg font-bold text-gray-800">배출 장소 안내 (DB)</h2>
+      <div className="p-4 bg-white shadow-2xs flex items-center justify-between z-10 relative border-b">
+        <div className="flex items-center">
+          <Link href="/" className="text-gray-500 hover:text-gray-800 mr-3 p-1">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </Link>
+          <h2 className="text-lg font-bold text-gray-900">배출 장소 안내 (카카오맵)</h2>
+        </div>
+        <span className="text-[11px] bg-yellow-100 text-yellow-900 font-bold px-2.5 py-1 rounded-full border border-yellow-200">
+          Kakao Map
+        </span>
       </div>
 
-      <div className="w-full h-80 bg-gray-200 relative z-0">
-        {isClient && icon && (
-          <MapContainer 
-            center={[37.3216, 127.1268]} 
-            zoom={15} 
+      {/* 카카오맵 뷰포트 영역 */}
+      <div className="w-full h-84 bg-slate-100 relative z-0 flex items-center justify-center border-b">
+        {!kakaoAppKey ? (
+          <div className="p-6 text-center space-y-2 max-w-sm">
+            <div className="w-12 h-12 bg-yellow-100 text-yellow-700 rounded-2xl flex items-center justify-center mx-auto font-bold text-xl">
+              🗺️
+            </div>
+            <h3 className="font-bold text-gray-800 text-sm">카카오맵 JavaScript 키가 필요합니다</h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              카카오 디벨로퍼스에서 발급받은 <strong>JavaScript 키</strong>를 등록하시면 대한민국 초정밀 지도가 나타납니다.
+            </p>
+          </div>
+        ) : loading ? (
+          <div className="flex flex-col items-center space-y-2">
+            <span className="w-8 h-8 border-3 border-yellow-400 border-t-transparent rounded-full animate-spin"></span>
+            <p className="text-xs text-gray-500 font-semibold">카카오맵 로딩 중...</p>
+          </div>
+        ) : error ? (
+          <div className="p-4 text-center text-xs text-red-500">
+            카카오맵을 불러올 수 없습니다. 도메인 등록(Web 플랫폼)을 확인해주세요.
+          </div>
+        ) : (
+          <Map
+            center={{
+              lat: selectedLoc?.lat || 36.8335,
+              lng: selectedLoc?.lng || 127.1687,
+            }}
             style={{ width: '100%', height: '100%' }}
-            zoomControl={false}
+            level={4} // 확대 레벨
           >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
             {locations.map((loc) => (
-              <Marker key={loc.id} position={[loc.lat, loc.lng]} icon={icon}>
-                <Popup>
-                  <strong className="text-sm">{loc.name}</strong><br/>
-                  <span className="text-xs text-gray-500">{loc.address}</span>
-                </Popup>
-              </Marker>
+              <MapMarker
+                key={loc.id}
+                position={{ lat: loc.lat, lng: loc.lng }}
+                clickable={true}
+                onClick={() => setSelectedLoc(loc)}
+              >
+                {selectedLoc?.id === loc.id && (
+                  <div className="p-2 text-xs font-bold text-gray-900 bg-white rounded-lg shadow-md border border-gray-200 text-center min-w-[120px]">
+                    <p className="text-primary-600 truncate">{loc.name}</p>
+                    <p className="text-[10px] text-gray-500 font-normal truncate mt-0.5">{loc.address}</p>
+                  </div>
+                )}
+              </MapMarker>
             ))}
-          </MapContainer>
+          </Map>
         )}
       </div>
 
-      <div className="p-4 flex-1 overflow-y-auto">
-        <h3 className="font-bold text-gray-700 mb-3 px-1">등록된 배출 장소 목록</h3>
-        <div className="space-y-3">
-          {locations.map(loc => (
-            <div key={loc.id} className="p-4 bg-white rounded-xl shadow-sm border border-gray-100 flex items-start">
-              <div className="w-10 h-10 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mr-3 shrink-0">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+      {/* 등록된 배출 장소 목록 */}
+      <div className="p-4 flex-1 overflow-y-auto space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="font-bold text-gray-800 text-sm">등록된 배출 장소 목록 ({locations.length}곳)</h3>
+          <span className="text-xs text-gray-400">카드를 누르면 지도가 이동합니다</span>
+        </div>
+
+        <div className="space-y-2.5">
+          {locations.map((loc) => {
+            const isSelected = selectedLoc?.id === loc.id;
+            return (
+              <div
+                key={loc.id}
+                onClick={() => setSelectedLoc(loc)}
+                className={`p-4 bg-white rounded-xl shadow-2xs border transition cursor-pointer flex items-start justify-between ${
+                  isSelected ? 'border-primary-500 ring-2 ring-primary-100 bg-primary-50/20' : 'border-gray-100 hover:border-gray-200'
+                }`}
+              >
+                <div className="flex items-start space-x-3">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
+                    isSelected ? 'bg-primary-600 text-white' : 'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    📍
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-900 text-sm">{loc.name}</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">{loc.address}</p>
+                  </div>
+                </div>
+                {isSelected && (
+                  <span className="text-[11px] bg-primary-100 text-primary-700 font-bold px-2 py-0.5 rounded-full shrink-0">
+                    선택됨
+                  </span>
+                )}
               </div>
-              <div>
-                <h4 className="font-bold text-gray-800 text-sm">{loc.name}</h4>
-                <p className="text-xs text-gray-500 mt-1">{loc.address}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

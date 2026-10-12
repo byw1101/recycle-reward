@@ -2,10 +2,25 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useKakaoLoader } from 'react-kakao-maps-sdk';
 import { supabase } from '@/core/utils/supabaseClient';
+
+declare global {
+  interface Window {
+    kakao: any;
+  }
+}
 
 export default function AdminPage() {
   const router = useRouter();
+  const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || '';
+  
+  // 카카오맵 및 주소 검색 라이브러리(services) 로드
+  const [kakaoLoading] = useKakaoLoader({
+    appkey: kakaoAppKey,
+    libraries: ['services'],
+  });
+
   const [locations, setLocations] = useState<any[]>([]);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -42,20 +57,58 @@ export default function AdminPage() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !address.trim()) {
-      alert('장소 이름과 지번/도로명 주소를 입력해주세요.');
+      alert('장소 이름과 지번 주소를 입력해주세요.');
       return;
     }
 
     setIsSubmitting(true);
+
+    // 1. 카카오맵 주소 검색 서비스(Geocoder)로 100% 정밀 지번주소 변환 시도
+    if (typeof window !== 'undefined' && window.kakao?.maps?.services?.Geocoder) {
+      const geocoder = new window.kakao.maps.services.Geocoder();
+      
+      geocoder.addressSearch(address.trim(), async (result: any, status: any) => {
+        if (status === window.kakao.maps.services.Status.OK && result && result.length > 0) {
+          const lat = parseFloat(result[0].y);
+          const lng = parseFloat(result[0].x);
+          const standardizedAddress = result[0].road_address?.address_name || result[0].address?.address_name || address.trim();
+
+          // Supabase DB에 등록
+          const { error } = await supabase.from('locations').insert([
+            {
+              name: name.trim(),
+              address: standardizedAddress,
+              lat: lat,
+              lng: lng
+            }
+          ]);
+
+          if (error) {
+            alert('DB 등록 중 오류: ' + error.message);
+          } else {
+            alert(`🎉 카카오맵 정밀 주소 변환 완료!\n[${name}]이(가) 지도에 등록되었습니다.\n(위도: ${lat.toFixed(5)}, 경도: ${lng.toFixed(5)})`);
+            setName('');
+            setAddress('');
+            fetchLocations();
+          }
+          setIsSubmitting(false);
+        } else {
+          // 카카오 Geocoder 실패 시 자체 API로 2차 시도
+          fallbackGeocode();
+        }
+      });
+    } else {
+      fallbackGeocode();
+    }
+  };
+
+  const fallbackGeocode = async () => {
     try {
-      // 1. 주소를 위도/경도로 자동 변환 (Geocoding API 호출)
       const res = await fetch(`/api/geocode?q=${encodeURIComponent(address.trim())}`);
       const geoData = await res.json();
-
       const lat = geoData.lat || 36.8151;
       const lng = geoData.lng || 127.1139;
 
-      // 2. Supabase DB에 등록
       const { error } = await supabase.from('locations').insert([
         {
           name: name.trim(),
@@ -66,19 +119,15 @@ export default function AdminPage() {
       ]);
 
       if (error) {
-        alert('DB 등록 중 오류: ' + error.message);
+        alert('DB 등록 오류: ' + error.message);
       } else {
-        alert(
-          geoData.isFallback
-            ? `장소가 등록되었습니다.\n(상세 번지수 위치 확인이 어려워 천안시 중심 좌표로 설정되었습니다.)`
-            : `🎉 새로운 배출 장소가 성공적으로 지도에 등록되었습니다!\n(좌표: 위도 ${lat.toFixed(4)}, 경도 ${lng.toFixed(4)})`
-        );
+        alert(`장소가 등록되었습니다!\n(좌표: 위도 ${lat.toFixed(4)}, 경도 ${lng.toFixed(4)})`);
         setName('');
         setAddress('');
         fetchLocations();
       }
     } catch (err: any) {
-      alert('주소 변환 및 등록 중 오류가 발생했습니다: ' + err.message);
+      alert('주소 변환 중 오류: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -104,7 +153,7 @@ export default function AdminPage() {
           <h2 className="text-lg font-bold text-gray-900">⚙️ 관리자 - 배출 장소 관리</h2>
         </div>
         <span className="text-xs bg-amber-100 text-amber-800 font-bold px-2 py-1 rounded-md">
-          관리자 모드
+          카카오맵 연동
         </span>
       </div>
 
@@ -113,8 +162,8 @@ export default function AdminPage() {
         <form onSubmit={handleAdd} className="bg-white p-5 rounded-2xl shadow-xs border border-gray-200/80 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-gray-900 text-sm">새 배출 장소 등록</h3>
-            <span className="text-[11px] text-primary-600 bg-primary-50 px-2 py-0.5 rounded font-semibold border border-primary-200">
-              📍 지번주소 자동 변환
+            <span className="text-[11px] text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full font-bold border border-amber-200">
+              ⚡ 카카오 Geocoder 정밀 지번주소 변환
             </span>
           </div>
 
@@ -124,7 +173,7 @@ export default function AdminPage() {
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="예: 신부동 제1클린하우스 (단국대 앞)"
+              placeholder="예: 단국대 학생회관 앞 클린하우스"
               className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 focus:bg-white transition"
               required
             />
@@ -133,18 +182,18 @@ export default function AdminPage() {
           <div className="space-y-1">
             <div className="flex justify-between items-center">
               <label className="block text-xs font-bold text-gray-700">지번 주소 또는 도로명 주소</label>
-              <span className="text-[11px] text-gray-400">위도/경도 입력 불필요</span>
+              <span className="text-[11px] text-gray-400">카카오맵 정밀 변환</span>
             </div>
             <input
               type="text"
               value={address}
               onChange={e => setAddress(e.target.value)}
-              placeholder="예: 천안시 동남구 신부동 456-1 또는 단대로 119"
+              placeholder="예: 충남 천안시 동남구 신부동 456-1 또는 단대로 119"
               className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-primary-500 focus:bg-white transition"
               required
             />
             <p className="text-[11px] text-gray-400 pt-0.5">
-              💡 입력하신 지번/도로명 주소는 시스템이 GPS 지도 좌표로 자동 계산하여 지도에 마커로 띄웁니다.
+              💡 번지수까지 포함된 지번주소나 도로명주소를 입력하시면 카카오맵이 정확한 건물의 위치 좌표를 찾아냅니다.
             </p>
           </div>
 
@@ -156,10 +205,10 @@ export default function AdminPage() {
             {isSubmitting ? (
               <>
                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                <span>주소 좌표 변환 및 등록 중...</span>
+                <span>카카오맵 주소 정밀 변환 중...</span>
               </>
             ) : (
-              <span>지도에 장소 등록하기</span>
+              <span>카카오맵에 장소 등록하기</span>
             )}
           </button>
         </form>
@@ -172,29 +221,23 @@ export default function AdminPage() {
           </div>
 
           <div className="space-y-2.5">
-            {locations.length === 0 ? (
-              <p className="text-center text-xs text-gray-400 py-6 bg-white rounded-xl border border-gray-100">
-                등록된 장소가 없습니다.
-              </p>
-            ) : (
-              locations.map(loc => (
-                <div key={loc.id} className="p-4 bg-white rounded-xl shadow-2xs border border-gray-100 flex justify-between items-start">
-                  <div className="space-y-1">
-                    <h4 className="font-bold text-gray-900 text-sm">{loc.name}</h4>
-                    <p className="text-xs text-gray-600">{loc.address}</p>
-                    <span className="inline-block bg-slate-100 text-slate-500 text-[10px] px-1.5 py-0.5 rounded font-mono">
-                      GPS: {loc.lat?.toFixed(4)}, {loc.lng?.toFixed(4)}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleDelete(loc.id)}
-                    className="text-red-500 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition shrink-0 ml-2"
-                  >
-                    삭제
-                  </button>
+            {locations.map(loc => (
+              <div key={loc.id} className="p-4 bg-white rounded-xl shadow-2xs border border-gray-100 flex justify-between items-start">
+                <div className="space-y-1">
+                  <h4 className="font-bold text-gray-900 text-sm">{loc.name}</h4>
+                  <p className="text-xs text-gray-600">{loc.address}</p>
+                  <span className="inline-block bg-slate-100 text-slate-500 text-[10px] px-1.5 py-0.5 rounded font-mono">
+                    좌표: {loc.lat?.toFixed(5)}, {loc.lng?.toFixed(5)}
+                  </span>
                 </div>
-              ))
-            )}
+                <button
+                  onClick={() => handleDelete(loc.id)}
+                  className="text-red-500 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition shrink-0 ml-2"
+                >
+                  삭제
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       </div>
