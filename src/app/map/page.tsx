@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useKakaoLoader, Map, MapMarker } from 'react-kakao-maps-sdk';
 import { supabase } from '@/core/utils/supabaseClient';
@@ -36,6 +36,7 @@ function formatDistance(distKm: number | null | undefined) {
 
 export default function MapPage() {
   const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || 'd2614b7fbe124fc4d7968316a1df117c';
+  const mapRef = useRef<any>(null);
   
   const [loading, error] = useKakaoLoader({
     appkey: kakaoAppKey,
@@ -157,8 +158,8 @@ export default function MapPage() {
         </button>
       </div>
 
-      {/* 카카오맵 뷰포트 영역 (고정 높이 360px) */}
-      <div className="w-full h-[360px] bg-slate-200 relative z-0 border-b overflow-hidden">
+      {/* 카카오맵 뷰포트 영역 (고정 높이 400px 및 전체보기/내위치 제어 버튼) */}
+      <div className="w-full h-[400px] bg-slate-200 relative z-0 border-b overflow-hidden">
         {loading ? (
           <div className="w-full h-full flex flex-col items-center justify-center space-y-2 bg-slate-100">
             <span className="w-8 h-8 border-3 border-yellow-400 border-t-transparent rounded-full animate-spin"></span>
@@ -169,58 +170,97 @@ export default function MapPage() {
             카카오맵을 불러올 수 없습니다. 도메인 설정을 확인해주세요.
           </div>
         ) : (
-          <Map
-            center={{
-              lat: Number(selectedLoc?.lat || userPos?.lat || 36.8335),
-              lng: Number(selectedLoc?.lng || userPos?.lng || 127.1687),
-            }}
-            style={{ width: '100%', height: '360px' }}
-            level={4}
-          >
-            {/* 1. 내 현재 위치 마커 (파란색 원형 마커 표시) */}
-            {userPos && (
-              <MapMarker
-                position={{ lat: userPos.lat, lng: userPos.lng }}
-                image={{
-                  src: 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
-                  size: { width: 24, height: 35 },
-                }}
-              >
-                <div className="p-1.5 text-[11px] font-bold text-blue-800 bg-blue-50 rounded-md border border-blue-200 text-center">
-                  📍 내 현재 위치
-                </div>
-              </MapMarker>
-            )}
-
-            {/* 2. 등록된 쓰레기 배출 장소 마커들 */}
-            {sortedLocations.map((loc, idx) => {
-              const isSelected = selectedLoc?.id === loc.id;
-              const isNearest = idx === 0 && userPos != null;
-              return (
+          <>
+            <Map
+              center={{
+                lat: Number(selectedLoc?.lat || userPos?.lat || 36.8335),
+                lng: Number(selectedLoc?.lng || userPos?.lng || 127.1687),
+              }}
+              style={{ width: '100%', height: '400px' }}
+              level={5}
+              onCreate={(map) => {
+                mapRef.current = map;
+                // 초기 로드 시 모든 마커가 한눈에 보이도록 영역 자동 맞춤
+                if (sortedLocations.length > 0 && window.kakao?.maps) {
+                  const bounds = new window.kakao.maps.LatLngBounds();
+                  sortedLocations.forEach((loc) => {
+                    const lat = Number(loc.lat);
+                    const lng = Number(loc.lng);
+                    if (lat >= 36.7 && lat <= 36.9 && lng >= 127.0 && lng <= 127.3) {
+                      bounds.extend(new window.kakao.maps.LatLng(lat, lng));
+                    }
+                  });
+                  setTimeout(() => map.setBounds(bounds), 300);
+                }
+              }}
+            >
+              {/* 1. 내 현재 위치 마커 */}
+              {userPos && (
                 <MapMarker
-                  key={loc.id}
-                  position={{ lat: Number(loc.lat), lng: Number(loc.lng) }}
-                  clickable={true}
-                  onClick={() => setSelectedLoc(loc)}
+                  position={{ lat: userPos.lat, lng: userPos.lng }}
+                  image={{
+                    src: 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
+                    size: { width: 24, height: 35 },
+                  }}
                 >
-                  {isSelected && (
-                    <div className="p-2 text-xs font-bold text-gray-900 bg-white rounded-lg shadow-md border border-gray-200 text-center min-w-[130px]">
-                      <div className="flex items-center justify-center space-x-1">
-                        {isNearest && <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1 rounded">가장 가까움</span>}
-                        <p className="text-primary-600 truncate">{loc.name}</p>
-                      </div>
-                      <p className="text-[10px] text-gray-500 font-normal truncate mt-0.5">{loc.address}</p>
-                      {loc.distance != null && (
-                        <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
-                          내 위치에서 약 {formatDistance(loc.distance)}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  <div className="p-1.5 text-[11px] font-bold text-blue-800 bg-blue-50 rounded-md border border-blue-200 text-center">
+                    📍 내 현재 위치
+                  </div>
                 </MapMarker>
-              );
-            })}
-          </Map>
+              )}
+
+              {/* 2. 등록된 쓰레기 배출 장소 마커들 */}
+              {sortedLocations.map((loc, idx) => {
+                const isSelected = selectedLoc?.id === loc.id;
+                const isNearest = idx === 0 && userPos != null;
+                return (
+                  <MapMarker
+                    key={loc.id}
+                    position={{ lat: Number(loc.lat), lng: Number(loc.lng) }}
+                    clickable={true}
+                    onClick={() => setSelectedLoc(loc)}
+                  >
+                    {isSelected && (
+                      <div className="p-2 text-xs font-bold text-gray-900 bg-white rounded-lg shadow-md border border-gray-200 text-center min-w-[130px]">
+                        <div className="flex items-center justify-center space-x-1">
+                          {isNearest && <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1 rounded">가장 가까움</span>}
+                          <p className="text-primary-600 truncate">{loc.name}</p>
+                        </div>
+                        <p className="text-[10px] text-gray-500 font-normal truncate mt-0.5">{loc.address}</p>
+                        {loc.distance != null && (
+                          <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
+                            내 위치에서 약 {formatDistance(loc.distance)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </MapMarker>
+                );
+              })}
+            </Map>
+
+            {/* 지도 위 플로팅 '전체 한눈에 보기' 컨트롤 버튼 */}
+            <div className="absolute top-3 right-3 z-10 flex flex-col space-y-1.5">
+              <button
+                onClick={() => {
+                  if (mapRef.current && window.kakao?.maps && sortedLocations.length > 0) {
+                    const bounds = new window.kakao.maps.LatLngBounds();
+                    sortedLocations.forEach((loc) => {
+                      const lat = Number(loc.lat);
+                      const lng = Number(loc.lng);
+                      if (lat >= 36.7 && lat <= 36.9 && lng >= 127.0 && lng <= 127.3) {
+                        bounds.extend(new window.kakao.maps.LatLng(lat, lng));
+                      }
+                    });
+                    mapRef.current.setBounds(bounds);
+                  }
+                }}
+                className="bg-white/95 hover:bg-white text-gray-800 text-[11px] font-extrabold px-3 py-2 rounded-xl shadow-md border border-gray-200/80 transition flex items-center space-x-1 backdrop-blur-xs"
+              >
+                <span>🌐 전체 한눈에 보기</span>
+              </button>
+            </div>
+          </>
         )}
       </div>
 
