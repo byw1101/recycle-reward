@@ -75,18 +75,48 @@ export default function Header() {
       <header className="bg-white px-5 py-3.5 border-b border-slate-100 flex justify-between items-center sticky top-0 z-40">
         {/* 좌측 로고 및 타이틀 (스티치 디자인 1:1 재현) */}
         <Link href="/" className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-xs">
-            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" strokeOpacity={0.35} />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.5 14.5A4 4 0 0112 8c1.5 0 2.8.8 3.5 2M15.5 9.5A4 4 0 0112 16c-1.5 0-2.8-.8-3.5-2" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14 7.5l2 2.5-2.5.5M10 16.5l-2-2.5 2.5-.5" />
+          <div className="w-10 h-10 bg-[#e8fbf2] rounded-full flex items-center justify-center relative shrink-0">
+            <svg className="w-6 h-6" viewBox="0 0 28 28" fill="none">
+              {/* 상단 파란색 순환 화살표 */}
+              <path
+                d="M7 14.5a7 7 0 0112.2-4.6"
+                stroke="#2563eb"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              <path
+                d="M16.4 9.7l3 .6-.8 2.9"
+                stroke="#2563eb"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* 하단 초록색 순환 화살표 */}
+              <path
+                d="M21 13.5a7 7 0 01-12.2 4.6"
+                stroke="#059669"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              <path
+                d="M11.6 18.3l-3-.6.8-2.9"
+                stroke="#059669"
+                strokeWidth="2.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* 중앙 에코 번개/잎 심볼 */}
+              <path
+                d="M14.8 10.5L11.8 14.3h2.3l-.9 3.2 3-3.8h-2.3l.9-3.2z"
+                fill="#10b981"
+              />
             </svg>
           </div>
           <div>
-            <p className="text-[10px] font-extrabold text-emerald-600 leading-none tracking-tight">
-              에코 스마트 시티
+            <p className="text-[11px] font-bold text-[#2f855a] leading-none tracking-tight">
+              Recycle Cheonan
             </p>
-            <h1 className="text-lg font-black text-slate-900 leading-tight mt-0.5">
+            <h1 className="text-lg font-extrabold text-slate-900 leading-tight mt-0.5">
               Home
             </h1>
           </div>
