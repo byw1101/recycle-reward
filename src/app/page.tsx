@@ -162,7 +162,7 @@ export default function Home() {
             일몰 후 배출 시간 준수
           </span>
           <span className="absolute bottom-2.5 right-3 bg-slate-900/80 text-emerald-400 font-extrabold text-[11px] px-2.5 py-0.5 rounded-lg z-10 border border-emerald-500/30">
-            건당 +100P
+            건당 +10P
           </span>
         </div>
 

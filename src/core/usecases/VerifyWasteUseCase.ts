@@ -17,7 +17,7 @@ export class VerifyWasteUseCase {
     }
 
     const userId = session.user.id;
-    const earnedPoints = 100;
+    const earnedPoints = 10;
 
     // 3. 현재 포인트 조회 후 업데이트 (실제 서비스에선 RPC 함수 등을 쓰는 것이 안전)
     const { data: profile } = await supabase.from('profiles').select('points').eq('id', userId).single();

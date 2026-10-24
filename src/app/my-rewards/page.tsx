@@ -59,8 +59,8 @@ export default function MyRewardsPage() {
       alert('보유하신 잔여 포인트보다 많은 금액은 전환할 수 없습니다.');
       return;
     }
-    if (amount < 100) {
-      alert('최소 100P 이상부터 천안사랑카드로 전환 가능합니다.');
+    if (amount < 10) {
+      alert('최소 10P 이상부터 천안사랑카드로 전환 가능합니다.');
       return;
     }
     if (!cardNumber.trim()) {
@@ -133,7 +133,7 @@ export default function MyRewardsPage() {
         {/* 🌟 천안사랑카드 포인트 전환 버튼 */}
         <button
           onClick={handleOpenModal}
-          disabled={loading || points < 100}
+          disabled={loading || points < 10}
           className="w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black py-3.5 px-4 rounded-xl shadow-md transition flex items-center justify-center space-x-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span>💳 천안사랑카드 포인트로 전환</span>
@@ -216,7 +216,7 @@ export default function MyRewardsPage() {
                     value={convertAmount}
                     onChange={(e) => setConvertAmount(e.target.value)}
                     max={points}
-                    min={100}
+                    min={10}
                     placeholder="전환할 금액 입력"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-bold text-gray-900 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
                   />
